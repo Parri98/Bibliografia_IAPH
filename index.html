@@ -3,61 +3,73 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Generador y corrector de bibliografía para IAPH / revista PH y APA 7" />
+  <meta name="description" content="Generador y revisor de referencias bibliográficas según IAPH / revista PH y APA 7." />
   <title>Bibliografía IAPH · APA 7</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<header class="site-header">
+<header class="hero">
   <div class="wrap">
     <p class="eyebrow">Herramienta bibliográfica</p>
     <h1>Bibliografía IAPH · APA 7</h1>
-    <p class="lead">Genera referencias, corrige referencias pegadas y revisa bibliografías completas.</p>
+    <p class="lead">Genera, corrige y completa referencias bibliográficas identificando exactamente qué datos faltan.</p>
   </div>
 </header>
 
 <main class="wrap main">
-  <section class="card control-card">
-    <div class="control-row">
-      <div class="field">
-        <label for="styleSelect">Sistema bibliográfico</label>
-        <select id="styleSelect">
-          <option value="iaph">IAPH / revista PH</option>
-          <option value="apa">APA 7</option>
-        </select>
-      </div>
-      <div class="tabs" role="tablist" aria-label="Funciones">
-        <button class="tab active" data-tab="generator" type="button">Generador guiado</button>
-        <button class="tab" data-tab="corrector" type="button">Corrección libre</button>
-        <button class="tab" data-tab="bibliografia" type="button">Bibliografía completa</button>
-      </div>
+  <section class="card topbar">
+    <div class="field style-field">
+      <label for="styleSelect">Sistema bibliográfico</label>
+      <select id="styleSelect">
+        <option value="iaph">IAPH / revista PH</option>
+        <option value="apa">APA 7</option>
+      </select>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="Funciones">
+      <button class="tab active" type="button" data-tab="generator">Generar</button>
+      <button class="tab" type="button" data-tab="corrector">Corregir y completar</button>
+      <button class="tab" type="button" data-tab="bulk">Revisar bibliografía</button>
+      <button class="tab" type="button" data-tab="tests">Pruebas internas</button>
     </div>
   </section>
 
   <section id="generator" class="panel active">
     <div class="grid">
       <section class="card">
-        <p class="eyebrow dark">Paso 1</p>
-        <h2>Generar referencia</h2>
+        <p class="eyebrow dark">Generador guiado</p>
+        <h2>Datos de la fuente</h2>
+
         <div class="field">
           <label for="typeSelect">Tipo de documento</label>
           <select id="typeSelect"></select>
         </div>
+
         <div id="fields"></div>
       </section>
 
-      <aside class="card">
+      <aside class="card result-card">
         <p class="eyebrow dark">Resultado</p>
-        <h2>Referencia generada</h2>
+        <h2>Referencia final</h2>
         <div id="generated" class="output muted">Completa los campos.</div>
 
-        <h3>Cita en texto</h3>
-        <div id="citation" class="output compact muted">—</div>
+        <div class="result-grid">
+          <div>
+            <h3>Cita parentética</h3>
+            <div id="citationParenthetical" class="output compact muted">—</div>
+          </div>
+          <div>
+            <h3>Cita narrativa</h3>
+            <div id="citationNarrative" class="output compact muted">—</div>
+          </div>
+        </div>
 
         <div class="actions">
           <button id="copyGenerated" class="btn primary" type="button">Copiar referencia</button>
           <button id="clearGenerated" class="btn secondary" type="button">Limpiar</button>
         </div>
+
+        <div id="generatorNote" class="note"></div>
       </aside>
     </div>
   </section>
@@ -65,9 +77,9 @@
   <section id="corrector" class="panel">
     <div class="grid">
       <section class="card">
-        <p class="eyebrow dark">Corrección automática</p>
-        <h2>Pega una referencia completa</h2>
-        <p class="help">No hace falta separar autor, año, título o revista. El programa intenta detectar el tipo y normalizarla.</p>
+        <p class="eyebrow dark">Corrección y completado</p>
+        <h2>Pega una referencia tal como te la hayan enviado</h2>
+        <p class="help">El programa intenta detectar el tipo documental y extraer los datos disponibles. Después te dice exactamente qué falta y te permite completarlo sin inventar información.</p>
 
         <div class="field">
           <label for="freeType">Tipo de documento</label>
@@ -78,39 +90,63 @@
 
         <div class="field">
           <label for="freeInput">Referencia original</label>
-          <textarea id="freeInput" rows="10" placeholder="Pega aquí la referencia tal como te la hayan enviado..."></textarea>
+          <textarea id="freeInput" rows="10" placeholder="Pega aquí la referencia completa..."></textarea>
         </div>
 
         <div class="actions">
-          <button id="correctButton" class="btn primary" type="button">Corregir referencia</button>
-          <button id="exampleButton" class="btn secondary" type="button">Cargar ejemplo</button>
+          <button id="analyzeButton" class="btn primary" type="button">Analizar referencia</button>
+          <button id="exampleButton" class="btn secondary" type="button">Cargar ejemplo incompleto</button>
           <button id="clearFree" class="btn secondary" type="button">Limpiar</button>
         </div>
       </section>
 
       <aside class="card">
         <h2>Diagnóstico</h2>
-        <div id="diagnosis" class="output muted">Introduce una referencia.</div>
+        <div id="diagnosis" class="output muted">Introduce una referencia y pulsa “Analizar referencia”.</div>
 
-        <h3>Referencia corregida</h3>
-        <div id="corrected" class="output muted">—</div>
+        <div id="checklistWrap" class="hidden">
+          <h3>Datos encontrados y datos que faltan</h3>
+          <div id="fieldChecklist" class="checklist"></div>
+        </div>
 
-        <h3>Cita en texto</h3>
-        <div id="freeCitation" class="output compact muted">—</div>
+        <div id="missingWrap" class="hidden">
+          <h3>Completar datos que faltan</h3>
+          <p id="missingIntro" class="help"></p>
+          <div id="missingFields"></div>
+          <div class="actions">
+            <button id="completeButton" class="btn primary" type="button">Completar y corregir</button>
+          </div>
+        </div>
 
-        <div class="actions">
-          <button id="copyCorrected" class="btn primary" type="button">Copiar corrección</button>
+        <div id="finalWrap" class="hidden">
+          <h3>Referencia corregida</h3>
+          <div id="corrected" class="output">—</div>
+
+          <div class="result-grid">
+            <div>
+              <h3>Cita parentética</h3>
+              <div id="freeParenthetical" class="output compact">—</div>
+            </div>
+            <div>
+              <h3>Cita narrativa</h3>
+              <div id="freeNarrative" class="output compact">—</div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="copyCorrected" class="btn primary" type="button">Copiar corrección</button>
+          </div>
         </div>
       </aside>
     </div>
   </section>
 
-  <section id="bibliografia" class="panel">
+  <section id="bulk" class="panel">
     <div class="grid">
       <section class="card">
         <p class="eyebrow dark">Revisión por lotes</p>
         <h2>Bibliografía recibida</h2>
-        <p class="help">Introduce una referencia por línea y revisaremos todas con el estilo seleccionado.</p>
+        <p class="help">Introduce una referencia por línea. El resultado indicará qué datos faltan en cada una.</p>
 
         <div class="field">
           <label for="bulkInput">Referencias</label>
@@ -124,20 +160,42 @@
       </section>
 
       <aside class="card">
-        <h2>Resultado de la revisión</h2>
-        <div id="bulkResult" class="bulk-results muted">Todavía no se ha analizado ninguna referencia.</div>
+        <h2>Resultado</h2>
+        <div id="bulkSummary" class="summary muted">Todavía no se ha analizado ninguna referencia.</div>
+        <div id="bulkResult" class="bulk-results"></div>
       </aside>
     </div>
   </section>
 
+  <section id="tests" class="panel">
+    <section class="card">
+      <p class="eyebrow dark">Control de calidad</p>
+      <h2>Pruebas internas</h2>
+      <p class="help">Comprueban que los ejemplos reales de revista PH y APA 7 siguen saliendo con la estructura esperada.</p>
+
+      <div class="actions">
+        <button id="runTests" class="btn primary" type="button">Ejecutar pruebas</button>
+      </div>
+
+      <div id="testSummary" class="summary muted">Aún no se han ejecutado.</div>
+      <div id="testResults" class="test-results"></div>
+    </section>
+  </section>
+
   <section class="card">
-    <h2>Nota de uso</h2>
-    <p class="help">La herramienta aplica reglas automáticas basadas en las normas aportadas de revista PH/IAPH y APA 7. Los casos incompletos, referencias antiguas o documentos especiales pueden requerir revisión manual.</p>
+    <h2>Criterio de fiabilidad</h2>
+    <div class="legend">
+      <span class="status ok">✓ Correcta</span>
+      <span class="status review">⚠ Revisar</span>
+      <span class="status bad">✕ Incorrecta</span>
+      <span class="status unknown">? Datos insuficientes</span>
+    </div>
+    <p class="help">El sistema no inventa datos bibliográficos ausentes. Si no puede extraerlos con seguridad, los marca como faltantes para que podáis pedirlos o completarlos manualmente.</p>
   </section>
 </main>
 
 <footer class="footer">
-  <div class="wrap">Aplicación estática · preparada para GitHub Pages · sin backend</div>
+  <div class="wrap">Aplicación estática para GitHub Pages · sin backend · sin envío de datos</div>
 </footer>
 
 <script src="app.js"></script>
