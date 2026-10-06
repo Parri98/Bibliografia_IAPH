@@ -1,4 +1,4 @@
-# Bibliografía IAPH · APA 7 — V8
+# Bibliografía IAPH · APA 7 — V8.1
 
 Aplicación web estática para GitHub Pages orientada a generación, corrección y verificación bibliográfica.
 
@@ -93,3 +93,8 @@ Esta V8 sigue siendo una aplicación estática.
 - No se debe automatizar Google Scholar mediante scraping.
 - Una coincidencia bibliográfica es una ayuda a la revisión, no una confirmación automática.
 - Para una versión institucional con búsqueda web más amplia, caché, control de cuotas y APIs con claves privadas, conviene añadir un backend.
+
+
+## Corrección V8.1
+
+Se corrige un error de JavaScript de V8 que impedía inicializar el generador. V8.1 ha sido comprobada en navegador con generación IAPH y APA 7 y con las pruebas internas (4/4).

@@ -1104,6 +1104,86 @@ document.querySelectorAll("[data-search-source]").forEach(btn=>{
   btn.addEventListener("click",()=>openManualSearch(btn.dataset.searchSource));
 });
 
+
+function analyzeFree(){
+  const ref=$("freeInput").value.trim();
+  if(!ref){ resetAnalysis(); return; }
+
+  const style=styleSelect.value;
+  const type=freeType.value==="auto"?detectType(ref):freeType.value;
+  const result=analyzeCompleteness(ref,type,style);
+  analysisState={ref,style,type,result};
+
+  const status=determineStatus(result);
+  $("diagnosis").className="output";
+  $("diagnosis").innerHTML=`
+    <span class="status ${status}">${statusLabel(status)}</span>
+    <p><strong>Tipo detectado:</strong> ${esc(defs[style][type]?.label||type)}</p>
+    <p>${status==="ok"?"Se han identificado todos los datos obligatorios que este patrón necesita.":"Faltan datos necesarios para cerrar la referencia con seguridad."}</p>
+  `;
+
+  $("checklistWrap").classList.remove("hidden");
+  $("onlineWrap").classList.remove("hidden");
+  $("onlineStatus").classList.add("hidden");
+  $("onlineResults").innerHTML="";
+  renderChecklist(type,style,result);
+  renderMissingInputs(type,style,result);
+
+  const canBuild=result.missing.length===0 && result.conditionalMissing.length===0;
+  if(canBuild){
+    showFinal(buildCorrected(type,style,result.data),style,result.data);
+  } else {
+    $("finalWrap").classList.add("hidden");
+  }
+}
+
+function showFinal(ref,style,data){
+  $("finalWrap").classList.remove("hidden");
+  $("corrected").textContent=ref||"—";
+  const cites=style==="iaph"
+    ? iaphCitations(data.authors||"",data.year||"")
+    : apaCitations(data.authors||"",data.year||data.date||"");
+  $("freeParenthetical").textContent=cites.parenthetical;
+  $("freeNarrative").textContent=cites.narrative;
+}
+
+function completeFree(){
+  if(!analysisState) return;
+  const {style,type,result}=analysisState;
+  const data={...result.data};
+
+  document.querySelectorAll("[data-missing-name]").forEach(input=>{
+    const name=input.dataset.missingName;
+    const val=input.value.trim();
+    if(val) data[name]=val;
+  });
+
+  const finalCheck={...result,data};
+  finalCheck.missing=result.required.filter(name=>!String(data[name]||"").trim());
+  finalCheck.conditionalMissing=[];
+  if(type==="journal" && !(data.volume||data.issue||data.pages||data.article)){
+    finalCheck.conditionalMissing=["locator"];
+  }
+
+  analysisState.result=finalCheck;
+  renderChecklist(type,style,finalCheck);
+  renderMissingInputs(type,style,finalCheck);
+
+  const status=determineStatus(finalCheck);
+  $("diagnosis").className="output";
+  $("diagnosis").innerHTML=`
+    <span class="status ${status}">${statusLabel(status)}</span>
+    <p><strong>Tipo detectado:</strong> ${esc(defs[style][type]?.label||type)}</p>
+    <p>${status==="ok"?"La referencia ya dispone de los datos obligatorios detectables para este patrón.":"Siguen faltando datos. Completa los campos marcados con ✕."}</p>
+  `;
+
+  if(status==="ok"){
+    showFinal(buildCorrected(type,style,data),style,data);
+  } else {
+    $("finalWrap").classList.add("hidden");
+  }
+}
+
 function resetAnalysis(){
   analysisState=null;
   $("diagnosis").textContent="Introduce una referencia y pulsa “Analizar referencia”.";
