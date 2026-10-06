@@ -1,70 +1,95 @@
-# Bibliografía IAPH · APA 7 — V6
+# Bibliografía IAPH · APA 7 — V8
 
-Aplicación web estática preparada para GitHub Pages.
+Aplicación web estática para GitHub Pages orientada a generación, corrección y verificación bibliográfica.
 
-## Novedad principal de V6
+## Qué añade V8
 
-El corrector ya no se limita a decir si una referencia está bien o mal.
+### Búsqueda automática en fuentes bibliográficas abiertas
 
-Ahora:
+La aplicación intenta recuperar metadatos desde:
 
-1. Detecta el tipo de documento.
-2. Extrae los datos que puede reconocer.
-3. Muestra un checklist campo por campo.
-4. Marca con `✓` los datos encontrados.
-5. Marca con `✕` los datos obligatorios que faltan.
-6. Explica por qué se necesita cada dato.
-7. Genera automáticamente campos para completar solo lo que falta.
-8. No inventa información.
-9. Solo construye la referencia final cuando dispone de los datos necesarios detectables.
+- **Crossref**
+- **OpenAlex**
+- **DataCite**
+- **Open Library** (libros/capítulos)
 
-## Ejemplo
+Los resultados muestran:
+- fuente;
+- título;
+- coincidencia aproximada;
+- metadatos recuperados;
+- DOI cuando existe;
+- botón `Usar estos datos`.
 
-Referencia recibida:
+La aplicación **no aplica automáticamente** ningún registro encontrado. La persona revisora debe confirmar que se trata de la obra correcta.
 
-`Bellido Blanco, A. (2023) El paisaje y sus elementos esenciales: el patrimonio cultural. revista PH. Disponible en: https://doi.org/...`
+### Comprobación manual en buscadores utilizados por investigadores
 
-El programa puede indicar:
+V8 genera búsquedas directas para:
 
-- ✓ Autor
-- ✓ Año
-- ✓ Título
-- ✓ Revista
-- ✕ Número / volumen / páginas / localizador
-- ✓ DOI
-- ✕ Fecha de consulta
+- **Google Scholar**
+- **Dialnet**
+- **JSTOR**
+- **Google**
+- **Google Books**
 
-Y crea los campos necesarios para completarla.
+La consulta se construye con los datos ya detectados (preferentemente título + primer autor + año).
 
-## Funciones
+Esto es especialmente útil cuando:
+- el registro no tiene DOI;
+- es bibliografía española;
+- la obra no está en Crossref/OpenAlex/DataCite;
+- se necesita comprobar la edición exacta;
+- el artículo está indexado en Dialnet/JSTOR/Scholar pero no en una API abierta.
 
-- Generador guiado IAPH / revista PH
-- Generador guiado APA 7
-- Cita parentética
-- Cita narrativa
-- Corrector libre
-- Detección de datos faltantes
-- Campos dinámicos para completar la referencia
-- Revisión de bibliografía completa por lotes
-- Pruebas internas con ejemplos reales
+## Flujo recomendado
 
-## Publicar en GitHub Pages
+1. Pegar referencia.
+2. `Analizar referencia`.
+3. Revisar campos detectados.
+4. `Buscar datos automáticamente`.
+5. Confirmar una coincidencia si es correcta.
+6. Si quedan dudas, abrir:
+   - Google Scholar,
+   - Dialnet,
+   - JSTOR.
+7. Completar manualmente cualquier dato aún pendiente.
+8. `Completar y corregir`.
+9. Copiar referencia final IAPH / revista PH o APA 7.
 
-1. Crea un repositorio.
-2. Sube `index.html`, `style.css`, `app.js` y `README.md`.
-3. Ve a `Settings > Pages`.
-4. Selecciona `Deploy from a branch`.
-5. Rama `main`.
-6. Carpeta `/ (root)`.
-
-## Base documental
+## Sistemas bibliográficos
 
 ### IAPH / revista PH
-Se han utilizado las normas aportadas y ejemplos reales publicados en `revista PH`, n.º 118 (2026).
+- Autor-fecha.
+- Cita parentética sin coma entre apellido y año.
+- Hasta tres autores en texto.
+- Más de tres: primer autor + `et ál.`.
+- Referencias en línea: `Disponible en:` + URL/DOI + `[Consulta: dd/mm/aaaa]`.
+- Todos los autores en bibliografía final.
 
 ### APA 7
-Se ha utilizado la guía aportada `Normas APA 7.ª edición. Guía de citación y referenciación`, segunda versión revisada y ampliada (2020), basada en el `Publication Manual of the American Psychological Association, 7th ed. (2019)`.
+- Citas parentéticas y narrativas diferenciadas.
+- Dos autores: `&` en parentética.
+- Tres o más: `et al.` desde la primera cita.
+- DOI en formato `https://doi.org/...`.
 
-## Limitación
+## GitHub Pages
 
-La extracción desde texto libre es heurística. Cuando un dato no puede identificarse con suficiente seguridad, V6 lo considera faltante en vez de inventarlo.
+Subir a la raíz:
+- `index.html`
+- `style.css`
+- `app.js`
+- `README.md`
+
+Después:
+`Settings > Pages > Deploy from a branch > main > / (root)`
+
+## Limitaciones técnicas
+
+Esta V8 sigue siendo una aplicación estática.
+
+- Crossref, OpenAlex, DataCite y Open Library dependen de sus APIs públicas y de la disponibilidad/CORS.
+- Google Scholar, Dialnet y JSTOR se usan mediante **búsquedas manuales preparadas**, no mediante scraping.
+- No se debe automatizar Google Scholar mediante scraping.
+- Una coincidencia bibliográfica es una ayuda a la revisión, no una confirmación automática.
+- Para una versión institucional con búsqueda web más amplia, caché, control de cuotas y APIs con claves privadas, conviene añadir un backend.

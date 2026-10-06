@@ -12,7 +12,7 @@
   <div class="wrap">
     <p class="eyebrow">Herramienta bibliográfica</p>
     <h1>Bibliografía IAPH · APA 7</h1>
-    <p class="lead">Genera, corrige y completa referencias bibliográficas identificando exactamente qué datos faltan.</p>
+    <p class="lead">Genera, corrige y completa referencias; busca metadatos académicos y facilita la comprobación en Google Scholar, Dialnet y JSTOR.</p>
   </div>
 </header>
 
@@ -107,6 +107,43 @@
         <div id="checklistWrap" class="hidden">
           <h3>Datos encontrados y datos que faltan</h3>
           <div id="fieldChecklist" class="checklist"></div>
+        </div>
+
+        <div id="onlineWrap" class="hidden">
+          <h3>Buscar y completar datos</h3>
+          <p class="help">
+            La búsqueda automática consulta fuentes bibliográficas abiertas. Para Google Scholar, Dialnet y JSTOR se preparan búsquedas manuales con la referencia ya escrita.
+          </p>
+
+          <div class="search-source-grid">
+            <div class="source-card">
+              <strong>Búsqueda automática</strong>
+              <span>Crossref · OpenAlex · DataCite · Open Library</span>
+            </div>
+            <div class="source-card">
+              <strong>Comprobación académica</strong>
+              <span>Google Scholar · Dialnet · JSTOR · Google</span>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="onlineSearchButton" class="btn primary" type="button">Buscar datos automáticamente</button>
+          </div>
+
+          <div id="onlineStatus" class="note hidden"></div>
+          <div id="onlineResults" class="online-results"></div>
+
+          <div class="manual-search-box">
+            <h4>Comprobar en buscadores académicos</h4>
+            <p class="help">Se abrirá una nueva pestaña con una búsqueda construida a partir del título, autor y año detectados.</p>
+            <div class="manual-buttons">
+              <button class="btn source-button" data-search-source="scholar" type="button">Google Scholar</button>
+              <button class="btn source-button" data-search-source="dialnet" type="button">Dialnet</button>
+              <button class="btn source-button" data-search-source="jstor" type="button">JSTOR</button>
+              <button class="btn source-button" data-search-source="google" type="button">Google</button>
+              <button class="btn source-button" data-search-source="books" type="button">Google Books</button>
+            </div>
+          </div>
         </div>
 
         <div id="missingWrap" class="hidden">

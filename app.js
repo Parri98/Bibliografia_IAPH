@@ -688,84 +688,430 @@ function statusLabel(s){
   return {ok:"✓ Completa",review:"⚠ Revisar",bad:"✕ Incorrecta",unknown:"? Datos insuficientes"}[s];
 }
 
-function analyzeFree(){
-  const ref=$("freeInput").value.trim();
-  if(!ref){ resetAnalysis(); return; }
 
-  const style=styleSelect.value;
-  const type=freeType.value==="auto"?detectType(ref):freeType.value;
-  const result=analyzeCompleteness(ref,type,style);
-  analysisState={ref,style,type,result};
+function todayIaph(){
+  const d=new Date();
+  const dd=String(d.getDate()).padStart(2,"0");
+  const mm=String(d.getMonth()+1).padStart(2,"0");
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
 
+function initialsFromGiven(given=""){
+  return given.split(/\s+/).filter(Boolean).map(x=>x[0]?.toUpperCase()+".").join(" ");
+}
+
+function crossrefAuthors(list=[]){
+  return list.map(a=>{
+    const family=(a.family||"").trim();
+    const given=(a.given||"").trim();
+    return family ? `${family}, ${initialsFromGiven(given)}`.trim() : (given||"");
+  }).filter(Boolean).join("; ");
+}
+
+function normalizePages(p=""){
+  return String(p||"").replace(/[–—]/g,"-");
+}
+
+function crossrefToData(item,type,style){
+  const d={};
+  if(item.author?.length) d.authors=crossrefAuthors(item.author);
+  const year=item.published?.["date-parts"]?.[0]?.[0] || item.issued?.["date-parts"]?.[0]?.[0] || item.created?.["date-parts"]?.[0]?.[0];
+  if(year){ d.year=String(year); d.date=String(year); }
+  if(item.title?.[0]) d.title=item.title[0];
+  if(item["container-title"]?.[0]) d.journal=item["container-title"][0];
+  if(item.volume) d.volume=String(item.volume);
+  if(item.issue) d.issue=String(item.issue);
+  if(item.page) d.pages=normalizePages(item.page);
+  if(item["article-number"]) d.article=String(item["article-number"]);
+  if(item.publisher) d.publisher=item.publisher;
+  if(item.DOI) d.doi=`https://doi.org/${item.DOI}`;
+  if(item.URL && !d.doi) d.url=item.URL;
+  if(style==="iaph" && (d.doi||d.url)) d.access=todayIaph();
+  return d;
+}
+
+function openLibraryAuthors(doc){
+  const a=(doc.author_name||[]).map(n=>{
+    const parts=String(n).trim().split(/\s+/);
+    if(parts.length===1) return parts[0];
+    const family=parts.pop();
+    return `${family}, ${parts.map(x=>x[0]?.toUpperCase()+".").join(" ")}`;
+  });
+  return a.join("; ");
+}
+
+function openLibraryToData(doc,style){
+  const d={};
+  if(doc.author_name?.length) d.authors=openLibraryAuthors(doc);
+  if(doc.first_publish_year){ d.year=String(doc.first_publish_year); d.date=String(doc.first_publish_year); }
+  if(doc.title) d.title=doc.title;
+  if(Array.isArray(doc.publisher) && doc.publisher[0]) d.publisher=doc.publisher[0];
+  if(Array.isArray(doc.publish_place) && doc.publish_place[0]) d.place=doc.publish_place[0];
+  if(Array.isArray(doc.isbn) && doc.isbn[0]) d.isbn=doc.isbn[0];
+  if(style==="iaph" && d.url) d.access=todayIaph();
+  return d;
+}
+
+function mergeMissing(base,extra){
+  const out={...base};
+  Object.entries(extra||{}).forEach(([k,v])=>{
+    if(v && !String(out[k]||"").trim()) out[k]=v;
+  });
+  return out;
+}
+
+function similarity(a="",b=""){
+  const A=new Set(a.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(x=>x.length>2));
+  const B=new Set(b.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(x=>x.length>2));
+  if(!A.size||!B.size) return 0;
+  let common=0;
+  A.forEach(x=>{if(B.has(x)) common++;});
+  return common/Math.max(A.size,B.size);
+}
+
+async function searchCrossref(query){
+  const u=`https://api.crossref.org/works?rows=5&query.bibliographic=${encodeURIComponent(query)}`;
+  const res=await fetch(u,{headers:{"Accept":"application/json"}});
+  if(!res.ok) throw new Error(`Crossref respondió ${res.status}`);
+  const json=await res.json();
+  return (json.message?.items||[]).map(item=>({
+    source:"Crossref",
+    title:item.title?.[0]||"(sin título)",
+    subtitle:item["container-title"]?.[0]||item.publisher||"",
+    score:similarity(query,[item.title?.[0],item["container-title"]?.[0],item.publisher].filter(Boolean).join(" ")),
+    raw:item,
+    data:crossrefToData(item,analysisState?.type||"",analysisState?.style||styleSelect.value)
+  }));
+}
+
+async function searchOpenLibrary(query){
+  const fields="key,title,author_name,first_publish_year,publisher,publish_place,isbn";
+  const u=`https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}&limit=5`;
+  const res=await fetch(u,{headers:{"Accept":"application/json"}});
+  if(!res.ok) throw new Error(`Open Library respondió ${res.status}`);
+  const json=await res.json();
+  return (json.docs||[]).map(doc=>({
+    source:"Open Library",
+    title:doc.title||"(sin título)",
+    subtitle:[doc.author_name?.join(", "),doc.first_publish_year].filter(Boolean).join(" · "),
+    score:similarity(query,[doc.title,doc.author_name?.join(" ")].filter(Boolean).join(" ")),
+    raw:doc,
+    data:openLibraryToData(doc,analysisState?.style||styleSelect.value)
+  }));
+}
+
+function renderOnlineResults(results){
+  const box=$("onlineResults");
+  if(!results.length){
+    box.innerHTML='<div class="note">No se han encontrado coincidencias suficientemente útiles. La referencia seguirá marcada con los datos pendientes.</div>';
+    return;
+  }
+  box.innerHTML="";
+  results.slice(0,8).forEach((r,idx)=>{
+    const el=document.createElement("article");
+    el.className="online-result";
+    const confidence=Math.round((r.score||0)*100);
+    const found=Object.entries(r.data||{}).filter(([,v])=>v).map(([k,v])=>`${fieldLabel(analysisState.style,analysisState.type,k)}: ${v}`).slice(0,7);
+    el.innerHTML=`
+      <span class="source-tag">${esc(r.source)}</span>
+      <h4>${esc(r.title)}</h4>
+      ${r.subtitle?`<p>${esc(r.subtitle)}</p>`:""}
+      <p class="confidence">Coincidencia aproximada: ${confidence}%</p>
+      ${found.length?`<p><strong>Datos localizados:</strong> ${esc(found.join(" · "))}</p>`:""}
+      <button class="btn secondary apply-online" type="button" data-result-index="${idx}">Usar estos datos</button>
+    `;
+    box.appendChild(el);
+  });
+  box.querySelectorAll(".apply-online").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      const r=results[Number(btn.dataset.resultIndex)];
+      applyOnlineData(r.data,r.source);
+    });
+  });
+}
+
+function refreshAnalysisWithData(data,sourceNote=""){
+  if(!analysisState) return;
+  const {style,type}=analysisState;
+  const def=defs[style][type];
+  let required=[...def.required];
+  if(style==="iaph" && (data.url||data.doi) && !required.includes("access")) required.push("access");
+  const conditionalMissing=[];
+  if(type==="journal" && !(data.volume||data.issue||data.pages||data.article)) conditionalMissing.push("locator");
+  const missing=required.filter(name=>!String(data[name]||"").trim());
+  const optionalPresent=(def.optional||[]).filter(name=>String(data[name]||"").trim());
+  const result={data,required,missing,conditionalMissing,optionalPresent};
+  analysisState.result=result;
+  renderChecklist(type,style,result);
+  renderMissingInputs(type,style,result);
   const status=determineStatus(result);
   $("diagnosis").className="output";
   $("diagnosis").innerHTML=`
     <span class="status ${status}">${statusLabel(status)}</span>
     <p><strong>Tipo detectado:</strong> ${esc(defs[style][type]?.label||type)}</p>
-    <p>${status==="ok"?"Se han identificado todos los datos obligatorios que este patrón necesita.":"Faltan datos necesarios para cerrar la referencia con seguridad."}</p>
+    ${sourceNote?`<p><strong>Datos enriquecidos:</strong> ${esc(sourceNote)}</p>`:""}
+    <p>${status==="ok"?"Ya se dispone de los datos obligatorios detectables para este patrón.":"Siguen faltando datos; completa los campos marcados con ✕."}</p>
   `;
-
-  $("checklistWrap").classList.remove("hidden");
-  renderChecklist(type,style,result);
-  renderMissingInputs(type,style,result);
-
-  const canBuild=result.missing.length===0 && result.conditionalMissing.length===0;
-  if(canBuild){
-    showFinal(buildCorrected(type,style,result.data),style,result.data);
-  } else {
-    $("finalWrap").classList.add("hidden");
-  }
+  if(status==="ok") showFinal(buildCorrected(type,style,data),style,data);
+  else $("finalWrap").classList.add("hidden");
 }
 
-function showFinal(ref,style,data){
-  $("finalWrap").classList.remove("hidden");
-  $("corrected").textContent=ref||"—";
-  const cites=style==="iaph"?iaphCitations(data.authors||"",data.year||""):apaCitations(data.authors||"",data.year||data.date||"");
-  $("freeParenthetical").textContent=cites.parenthetical;
-  $("freeNarrative").textContent=cites.narrative;
-}
-
-function completeFree(){
+function applyOnlineData(extra,source){
   if(!analysisState) return;
-  const {style,type,result}=analysisState;
-  const data={...result.data};
+  let data=mergeMissing(analysisState.result.data,extra);
+  if(analysisState.style==="iaph" && (data.url||data.doi) && !data.access) data.access=todayIaph();
+  refreshAnalysisWithData(data,source);
+  $("onlineStatus").classList.remove("hidden");
+  $("onlineStatus").textContent=`Se han incorporado automáticamente los datos localizados en ${source}. Revisa el resultado antes de usarlo.`;
+}
 
-  document.querySelectorAll("[data-missing-name]").forEach(input=>{
-    const name=input.dataset.missingName;
-    const val=input.value.trim();
-    if(val) data[name]=val;
+
+function openAlexToData(work,style){
+  const d={};
+  const authors=(work.authorships||[]).map(a=>{
+    const name=a.author?.display_name||"";
+    const parts=name.trim().split(/\s+/);
+    if(parts.length<2) return name;
+    const family=parts.pop();
+    return `${family}, ${parts.map(x=>x[0]?.toUpperCase()+".").join(" ")}`;
+  }).filter(Boolean);
+  if(authors.length) d.authors=authors.join("; ");
+  if(work.publication_year){ d.year=String(work.publication_year); d.date=String(work.publication_year); }
+  if(work.title) d.title=work.title;
+  const loc=work.primary_location||{};
+  if(loc.source?.display_name) d.journal=loc.source.display_name;
+  if(work.biblio?.volume) d.volume=String(work.biblio.volume);
+  if(work.biblio?.issue) d.issue=String(work.biblio.issue);
+  if(work.biblio?.first_page){
+    d.pages=work.biblio.last_page && work.biblio.last_page!==work.biblio.first_page
+      ? `${work.biblio.first_page}-${work.biblio.last_page}`
+      : String(work.biblio.first_page);
+  }
+  if(work.doi) d.doi=String(work.doi).replace(/^https?:\/\/doi\.org\//i,"https://doi.org/");
+  if(!d.doi && work.id) d.url=work.id;
+  if(style==="iaph" && (d.doi||d.url)) d.access=todayIaph();
+  return d;
+}
+
+async function searchOpenAlex(query){
+  const u=`https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=5`;
+  const res=await fetch(u,{headers:{"Accept":"application/json"}});
+  if(!res.ok) throw new Error(`OpenAlex respondió ${res.status}`);
+  const json=await res.json();
+  return (json.results||[]).map(work=>({
+    source:"OpenAlex",
+    title:work.title||"(sin título)",
+    subtitle:[
+      work.primary_location?.source?.display_name,
+      work.publication_year
+    ].filter(Boolean).join(" · "),
+    score:similarity(query,[
+      work.title,
+      work.primary_location?.source?.display_name,
+      (work.authorships||[]).map(a=>a.author?.display_name).join(" ")
+    ].filter(Boolean).join(" ")),
+    raw:work,
+    data:openAlexToData(work,analysisState?.style||styleSelect.value)
+  }));
+}
+
+function dataCiteCreators(creators=[]){
+  return creators.map(c=>{
+    const family=c.familyName||"";
+    const given=c.givenName||"";
+    if(family) return `${family}, ${initialsFromGiven(given)}`.trim();
+    return c.name||"";
+  }).filter(Boolean).join("; ");
+}
+
+function dataCiteToData(item,style){
+  const a=item.attributes||{};
+  const d={};
+  if(a.creators?.length) d.authors=dataCiteCreators(a.creators);
+  if(a.publicationYear){ d.year=String(a.publicationYear); d.date=String(a.publicationYear); }
+  if(a.titles?.[0]?.title) d.title=a.titles[0].title;
+  if(a.publisher) d.publisher=a.publisher;
+  if(a.doi) d.doi=`https://doi.org/${String(a.doi).replace(/^https?:\/\/doi\.org\//i,"")}`;
+  if(a.url && !d.doi) d.url=a.url;
+  if(style==="iaph" && (d.doi||d.url)) d.access=todayIaph();
+  return d;
+}
+
+async function searchDataCite(query){
+  const u=`https://api.datacite.org/dois?query=${encodeURIComponent(query)}&page[size]=5`;
+  const res=await fetch(u,{headers:{"Accept":"application/vnd.api+json"}});
+  if(!res.ok) throw new Error(`DataCite respondió ${res.status}`);
+  const json=await res.json();
+  return (json.data||[]).map(item=>{
+    const a=item.attributes||{};
+    const title=a.titles?.[0]?.title||"(sin título)";
+    return {
+      source:"DataCite",
+      title,
+      subtitle:[a.publisher,a.publicationYear].filter(Boolean).join(" · "),
+      score:similarity(query,[
+        title,
+        a.publisher,
+        (a.creators||[]).map(c=>c.name||`${c.givenName||""} ${c.familyName||""}`).join(" ")
+      ].filter(Boolean).join(" ")),
+      raw:item,
+      data:dataCiteToData(item,analysisState?.style||styleSelect.value)
+    };
+  });
+}
+
+function bestSearchQuery(){
+  if(!analysisState) return "";
+  const d=analysisState.result?.data||{};
+  const bits=[];
+  if(d.title) bits.push(`"${d.title}"`);
+  const firstAuthor=splitAuthors(d.authors||"")[0];
+  if(firstAuthor) bits.push(surnameOf(firstAuthor));
+  if(d.year) bits.push(d.year);
+  if(!bits.length) return analysisState.ref;
+  return bits.join(" ");
+}
+
+function manualSearchUrl(source){
+  const q=bestSearchQuery();
+  const enc=encodeURIComponent(q);
+  const urls={
+    scholar:`https://scholar.google.com/scholar?q=${enc}`,
+    dialnet:`https://dialnet.unirioja.es/servlet/buscador?db=1&t=${enc}&td=todo`,
+    jstor:`https://www.jstor.org/action/doBasicSearch?Query=${enc}`,
+    google:`https://www.google.com/search?q=${enc}`,
+    books:`https://books.google.com/books?q=${enc}`
+  };
+  return urls[source]||urls.google;
+}
+
+function openManualSearch(source){
+  const u=manualSearchUrl(source);
+  window.open(u,"_blank","noopener,noreferrer");
+}
+
+function sourcePriority(name){
+  return {Crossref:4,OpenAlex:3,DataCite:2,"Open Library":1}[name]||0;
+}
+
+function metadataRows(data){
+  const order=["authors","year","date","title","journal","volume","issue","pages","article","publisher","place","doi","url","access"];
+  return order.filter(k=>data?.[k]).map(k=>`
+    <tr>
+      <td>${esc(fieldLabel(analysisState.style,analysisState.type,k))}</td>
+      <td>${esc(data[k])}</td>
+    </tr>
+  `).join("");
+}
+
+async function searchOnline(){
+  if(!analysisState) return;
+
+  const query=bestSearchQuery() || analysisState.ref;
+  $("onlineStatus").classList.remove("hidden");
+  $("onlineStatus").textContent="Buscando en Crossref, OpenAlex, DataCite y Open Library…";
+  $("onlineResults").innerHTML="";
+
+  const tasks=[
+    searchCrossref(query),
+    searchOpenAlex(query),
+    searchDataCite(query)
+  ];
+  if(["book","chapter"].includes(analysisState.type)){
+    tasks.push(searchOpenLibrary(query));
+  }
+
+  const settled=await Promise.allSettled(tasks);
+  let results=[];
+  const errors=[];
+
+  settled.forEach(s=>{
+    if(s.status==="fulfilled") results.push(...s.value);
+    else errors.push(s.reason?.message||"Error de búsqueda");
   });
 
-  const finalCheck={...result,data};
-  finalCheck.missing=result.required.filter(name=>!String(data[name]||"").trim());
-  finalCheck.conditionalMissing=[];
-  if(type==="journal" && !(data.volume||data.issue||data.pages||data.article)){
-    finalCheck.conditionalMissing=["locator"];
+  results=results
+    .filter(r=>r?.title)
+    .sort((a,b)=>{
+      const score=(b.score||0)-(a.score||0);
+      return score!==0 ? score : sourcePriority(b.source)-sourcePriority(a.source);
+    });
+
+  // Deduplicación aproximada por título + año/DOI.
+  const seen=new Set();
+  results=results.filter(r=>{
+    const d=r.data||{};
+    const key=(d.doi||`${(r.title||"").toLowerCase()}|${d.year||d.date||""}`).trim();
+    if(seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  const useful=results.filter(r=>(r.score||0)>=0.12);
+  const display=(useful.length?useful:results).slice(0,10);
+
+  if(!display.length){
+    $("onlineResults").innerHTML='<div class="note">No se han encontrado coincidencias suficientemente útiles. Prueba la comprobación manual en Google Scholar, Dialnet o JSTOR.</div>';
+  }else{
+    $("onlineResults").innerHTML="";
+    display.forEach((r,idx)=>{
+      const el=document.createElement("article");
+      el.className=`online-result ${idx===0 && (r.score||0)>=0.55 ? "best" : ""}`;
+      const confidence=Math.round((r.score||0)*100);
+      el.innerHTML=`
+        <div>
+          <span class="source-tag">${esc(r.source)}</span>
+          ${idx===0 && (r.score||0)>=0.55 ? '<span class="best-badge">Mejor coincidencia</span>' : ""}
+        </div>
+        <h4>${esc(r.title)}</h4>
+        ${r.subtitle?`<p>${esc(r.subtitle)}</p>`:""}
+        <p class="confidence">Coincidencia aproximada: ${confidence}%</p>
+        <table class="metadata-table"><tbody>${metadataRows(r.data||{})}</tbody></table>
+        <div class="actions">
+          <button class="btn secondary apply-online" type="button" data-result-index="${idx}">Usar estos datos</button>
+          ${r.data?.doi?`<button class="btn secondary open-doi" type="button" data-doi="${esc(r.data.doi)}">Abrir DOI</button>`:""}
+        </div>
+      `;
+      $("onlineResults").appendChild(el);
+    });
+
+    $("onlineResults").querySelectorAll(".apply-online").forEach(btn=>{
+      btn.addEventListener("click",()=>{
+        const r=display[Number(btn.dataset.resultIndex)];
+        applyOnlineData(r.data,r.source);
+      });
+    });
+
+    $("onlineResults").querySelectorAll(".open-doi").forEach(btn=>{
+      btn.addEventListener("click",()=>{
+        window.open(btn.dataset.doi,"_blank","noopener,noreferrer");
+      });
+    });
   }
 
-  analysisState.result=finalCheck;
-  renderChecklist(type,style,finalCheck);
-  renderMissingInputs(type,style,finalCheck);
+  $("onlineStatus").textContent = results.length
+    ? `Se han localizado ${results.length} posibles coincidencias en fuentes abiertas. Revisa el título y la autoría antes de aplicar un resultado.`
+    : (errors.length
+        ? `No se obtuvieron resultados automáticos. ${errors.join(" · ")}`
+        : "No se encontraron coincidencias.");
 
-  const status=determineStatus(finalCheck);
-  $("diagnosis").innerHTML=`
-    <span class="status ${status}">${statusLabel(status)}</span>
-    <p><strong>Tipo detectado:</strong> ${esc(defs[style][type]?.label||type)}</p>
-    <p>${status==="ok"?"La referencia ya dispone de los datos obligatorios detectables para este patrón.":"Siguen faltando datos. Completa los campos marcados con ✕."}</p>
-  `;
-
-  if(status==="ok"){
-    showFinal(buildCorrected(type,style,data),style,data);
-  } else {
-    $("finalWrap").classList.add("hidden");
+  if(errors.length && results.length){
+    $("onlineStatus").textContent += ` Algunas fuentes no respondieron: ${errors.join(" · ")}`;
   }
 }
+
+document.querySelectorAll("[data-search-source]").forEach(btn=>{
+  btn.addEventListener("click",()=>openManualSearch(btn.dataset.searchSource));
+});
 
 function resetAnalysis(){
   analysisState=null;
   $("diagnosis").textContent="Introduce una referencia y pulsa “Analizar referencia”.";
   $("diagnosis").className="output muted";
   $("checklistWrap").classList.add("hidden");
+  $("onlineWrap").classList.add("hidden");
+  $("onlineStatus").classList.add("hidden");
+  $("onlineResults").innerHTML="";
   $("missingWrap").classList.add("hidden");
   $("finalWrap").classList.add("hidden");
   $("fieldChecklist").innerHTML="";
@@ -782,6 +1128,7 @@ document.querySelectorAll(".tab").forEach(btn=>{
 });
 
 $("analyzeButton").addEventListener("click",analyzeFree);
+$("onlineSearchButton").addEventListener("click",searchOnline);
 $("completeButton").addEventListener("click",completeFree);
 
 $("exampleButton").addEventListener("click",()=>{
