@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Generador y corrector de bibliografía para IAPH / revista PH y APA 7" />
+  <title>Bibliografía IAPH · APA 7</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <p class="eyebrow">Herramienta bibliográfica</p>
+    <h1>Bibliografía IAPH · APA 7</h1>
+    <p class="lead">Genera referencias, corrige referencias pegadas y revisa bibliografías completas.</p>
+  </div>
+</header>
+
+<main class="wrap main">
+  <section class="card control-card">
+    <div class="control-row">
+      <div class="field">
+        <label for="styleSelect">Sistema bibliográfico</label>
+        <select id="styleSelect">
+          <option value="iaph">IAPH / revista PH</option>
+          <option value="apa">APA 7</option>
+        </select>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Funciones">
+        <button class="tab active" data-tab="generator" type="button">Generador guiado</button>
+        <button class="tab" data-tab="corrector" type="button">Corrección libre</button>
+        <button class="tab" data-tab="bibliografia" type="button">Bibliografía completa</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="generator" class="panel active">
+    <div class="grid">
+      <section class="card">
+        <p class="eyebrow dark">Paso 1</p>
+        <h2>Generar referencia</h2>
+        <div class="field">
+          <label for="typeSelect">Tipo de documento</label>
+          <select id="typeSelect"></select>
+        </div>
+        <div id="fields"></div>
+      </section>
+
+      <aside class="card">
+        <p class="eyebrow dark">Resultado</p>
+        <h2>Referencia generada</h2>
+        <div id="generated" class="output muted">Completa los campos.</div>
+
+        <h3>Cita en texto</h3>
+        <div id="citation" class="output compact muted">—</div>
+
+        <div class="actions">
+          <button id="copyGenerated" class="btn primary" type="button">Copiar referencia</button>
+          <button id="clearGenerated" class="btn secondary" type="button">Limpiar</button>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <section id="corrector" class="panel">
+    <div class="grid">
+      <section class="card">
+        <p class="eyebrow dark">Corrección automática</p>
+        <h2>Pega una referencia completa</h2>
+        <p class="help">No hace falta separar autor, año, título o revista. El programa intenta detectar el tipo y normalizarla.</p>
+
+        <div class="field">
+          <label for="freeType">Tipo de documento</label>
+          <select id="freeType">
+            <option value="auto">Detectar automáticamente</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="freeInput">Referencia original</label>
+          <textarea id="freeInput" rows="10" placeholder="Pega aquí la referencia tal como te la hayan enviado..."></textarea>
+        </div>
+
+        <div class="actions">
+          <button id="correctButton" class="btn primary" type="button">Corregir referencia</button>
+          <button id="exampleButton" class="btn secondary" type="button">Cargar ejemplo</button>
+          <button id="clearFree" class="btn secondary" type="button">Limpiar</button>
+        </div>
+      </section>
+
+      <aside class="card">
+        <h2>Diagnóstico</h2>
+        <div id="diagnosis" class="output muted">Introduce una referencia.</div>
+
+        <h3>Referencia corregida</h3>
+        <div id="corrected" class="output muted">—</div>
+
+        <h3>Cita en texto</h3>
+        <div id="freeCitation" class="output compact muted">—</div>
+
+        <div class="actions">
+          <button id="copyCorrected" class="btn primary" type="button">Copiar corrección</button>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <section id="bibliografia" class="panel">
+    <div class="grid">
+      <section class="card">
+        <p class="eyebrow dark">Revisión por lotes</p>
+        <h2>Bibliografía recibida</h2>
+        <p class="help">Introduce una referencia por línea y revisaremos todas con el estilo seleccionado.</p>
+
+        <div class="field">
+          <label for="bulkInput">Referencias</label>
+          <textarea id="bulkInput" rows="16" placeholder="Referencia 1&#10;Referencia 2&#10;Referencia 3"></textarea>
+        </div>
+
+        <div class="actions">
+          <button id="bulkButton" class="btn primary" type="button">Revisar bibliografía</button>
+          <button id="clearBulk" class="btn secondary" type="button">Limpiar</button>
+        </div>
+      </section>
+
+      <aside class="card">
+        <h2>Resultado de la revisión</h2>
+        <div id="bulkResult" class="bulk-results muted">Todavía no se ha analizado ninguna referencia.</div>
+      </aside>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Nota de uso</h2>
+    <p class="help">La herramienta aplica reglas automáticas basadas en las normas aportadas de revista PH/IAPH y APA 7. Los casos incompletos, referencias antiguas o documentos especiales pueden requerir revisión manual.</p>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap">Aplicación estática · preparada para GitHub Pages · sin backend</div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
